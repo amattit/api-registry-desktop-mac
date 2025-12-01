@@ -6,48 +6,155 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query private var items: [Item]
-
+    @StateObject private var serviceViewModel = ServiceViewModel()
+    @State private var selectedTab = 0
+    
     var body: some View {
-        NavigationSplitView {
-            List {
-                ForEach(items) { item in
-                    NavigationLink {
-                        Text("Item at \(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))")
-                    } label: {
-                        Text(item.timestamp, format: Date.FormatStyle(date: .numeric, time: .standard))
-                    }
+        TabView(selection: $selectedTab) {
+            DashboardView()
+                .environmentObject(serviceViewModel)
+                .tabItem {
+                    Label("Дашборд", systemImage: "house")
                 }
-                .onDelete(perform: deleteItems)
-            }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 200)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addItem) {
-                        Label("Add Item", systemImage: "plus")
-                    }
+                .tag(0)
+            
+            ServicesListView()
+                .environmentObject(serviceViewModel)
+                .tabItem {
+                    Label("Сервисы", systemImage: "cube")
                 }
+                .tag(1)
+            
+            // Placeholder for future tabs
+            Text("Зависимости")
+                .tabItem {
+                    Label("Зависимости", systemImage: "arrow.triangle.branch")
+                }
+                .tag(2)
+            
+            Text("Базы данных")
+                .tabItem {
+                    Label("Базы данных", systemImage: "cylinder")
+                }
+                .tag(3)
+        }
+        .frame(minWidth: 900, minHeight: 700)
+    }
+}
+
+// MARK: - Services List View
+
+struct ServicesListView: View {
+    @EnvironmentObject private var serviceViewModel: ServiceViewModel
+    @State private var showingCreateService = false
+    @State private var selectedService: ServiceResponse?
+    @State private var searchText = ""
+    
+    var filteredServices: [ServiceResponse] {
+        if searchText.isEmpty {
+            return serviceViewModel.services
+        } else {
+            return serviceViewModel.services.filter { service in
+                service.name.localizedCaseInsensitiveContains(searchText) ||
+                service.owner.localizedCaseInsensitiveContains(searchText) ||
+                service.tags.contains { $0.localizedCaseInsensitiveContains(searchText) }
             }
-        } detail: {
-            Text("Select an item")
         }
     }
-
-    private func addItem() {
-        withAnimation {
-            let newItem = Item(timestamp: Date())
-            modelContext.insert(newItem)
-        }
-    }
-
-    private func deleteItems(offsets: IndexSet) {
-        withAnimation {
-            for index in offsets {
-                modelContext.delete(items[index])
+    
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                // Header
+                HStack {
+                    Text("Сервисы")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                    
+                    Spacer()
+                    
+                    Button("Новый сервис") {
+                        showingCreateService = true
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .padding()
+                
+                // Search
+                HStack {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    
+                    TextField("Поиск сервисов...", text: $searchText)
+                        .textFieldStyle(.plain)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(NSColor.controlBackgroundColor))
+                )
+                .padding(.horizontal)
+                
+                // Services List
+                if serviceViewModel.isLoading {
+                    Spacer()
+                    ProgressView("Загрузка сервисов...")
+                    Spacer()
+                } else if filteredServices.isEmpty {
+                    Spacer()
+                    if searchText.isEmpty {
+                        EmptyStateView()
+                    } else {
+                        VStack(spacing: 16) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.system(size: 48))
+                                .foregroundColor(.gray)
+                            
+                            Text("Ничего не найдено")
+                                .font(.headline)
+                            
+                            Text("Попробуйте изменить поисковый запрос")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    Spacer()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 12) {
+                            ForEach(filteredServices) { service in
+                                ServiceRowView(service: service)
+                                    .onTapGesture {
+                                        selectedService = service
+                                    }
+                            }
+                        }
+                        .padding()
+                    }
+                }
+            }
+            .refreshable {
+                await serviceViewModel.loadServices()
+            }
+            .task {
+                await serviceViewModel.loadServices()
+            }
+            .sheet(isPresented: $showingCreateService) {
+                CreateServiceView()
+                    .environmentObject(serviceViewModel)
+            }
+            .sheet(item: $selectedService) { service in
+                EditServiceView(service: service)
+                    .environmentObject(serviceViewModel)
+            }
+            .alert("Ошибка", isPresented: .constant(serviceViewModel.errorMessage != nil)) {
+                Button("OK") {
+                    serviceViewModel.errorMessage = nil
+                }
+            } message: {
+                Text(serviceViewModel.errorMessage ?? "")
             }
         }
     }
@@ -55,5 +162,4 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: Item.self, inMemory: true)
 }

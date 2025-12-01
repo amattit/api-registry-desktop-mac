@@ -1,0 +1,15 @@
+{
+  "originHash" : "297c113a0f67dc95ab3ad3e66932e82d1e7587ff1c172027545e7acb5c86b05e",
+  "pins" : [
+    {
+      "identity" : "networking",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/amattit/Networking",
+      "state" : {
+        "revision" : "661f52b579f69b631269bcd8c15803a47bb81229",
+        "version" : "1.0.9"
+      }
+    }
+  ],
+  "version" : 3
+}

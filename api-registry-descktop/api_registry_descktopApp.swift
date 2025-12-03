@@ -7,9 +7,12 @@
 
 import SwiftUI
 import SwiftData
+import ar_services
 
 @main
 struct api_registry_descktopApp: App {
+    let factory = ARServicesFactory()
+    
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Item.self,
@@ -25,7 +28,7 @@ struct api_registry_descktopApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            factory.makeView()
         }
         .modelContainer(sharedModelContainer)
     }
